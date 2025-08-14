@@ -1,0 +1,5 @@
+{
+  "name": "Gran Rifa SAMMY",
+  "description": "Una aplicación web para la venta y gestión de boletos de una rifa. Los usuarios pueden seleccionar números, ver instrucciones de pago y confirmar su compra. El número ganador se basa en una lotería externa.",
+  "requestFramePermissions": []
+}

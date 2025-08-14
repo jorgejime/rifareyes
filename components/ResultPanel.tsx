@@ -38,13 +38,13 @@ const PurchaseForm: React.FC<Omit<PurchasePanelProps, 'viewingTicket' | 'isAdmin
   
   const formattedNumbers = selectedNumbers.join(', ');
   const whatsappMessage = encodeURIComponent(
-    `Hola SAMMY, quiero confirmar mi reserva para la rifa. Ya realicé el pago a Nequi ${NEQUI_NUMBER} y adjunto mi comprobante.\n\n` +
-    `*Números reservados:* ${formattedNumbers}\n` +
-    `*Total pagado:* $${total.toLocaleString('es-CO')} COP\n\n` +
+    `Hola SAMMY, quiero reservar los siguientes números para la rifa. En los próximos 30 minutos, realizaré el pago a Nequi ${NEQUI_NUMBER} y enviaré el comprobante para asegurar mi compra.\n\n` +
+    `*Números a reservar:* ${formattedNumbers}\n` +
+    `*Total a pagar:* $${total.toLocaleString('es-CO')} COP\n\n` +
     `*Mis datos de registro:*\n` +
     `- Nombre: ${userInfo.name}\n` +
     `- Cédula: ${userInfo.cedula}\n\n` +
-    `¡Muchas gracias!`
+    `¡Quedo atento!`
   );
   const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappMessage}`;
 

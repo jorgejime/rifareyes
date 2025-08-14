@@ -184,19 +184,19 @@ const App: React.FC = () => {
 
   if (!isInitialized) {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-indigo-900 to-indigo-800 flex items-center justify-center">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
             <p className="text-white text-2xl animate-pulse">Cargando Rifa...</p>
         </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 text-white flex flex-col items-center justify-between p-2 sm:p-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900 text-white flex flex-col items-center justify-between p-2 sm:p-4">
       <main className="w-full">
         <Header />
         <div className="mt-4 md:mt-8 flex flex-col lg:flex-row lg:items-start lg:justify-center gap-4 md:gap-8 px-2 sm:px-4">
           <div className="flex-shrink-0 lg:w-1/2 max-w-md w-full mx-auto">
-            <h2 className="text-xl font-bold text-center text-indigo-200 mb-4">1. Elige tu número</h2>
+            <h2 className="text-xl font-bold text-center text-slate-300 mb-4">1. Elige tu número</h2>
             <NumberSelector
               tickets={tickets}
               selectedNumbers={selectedNumbers}
@@ -206,7 +206,7 @@ const App: React.FC = () => {
             />
           </div>
           <div className="flex-shrink-0 lg:w-1/2 max-w-lg w-full mx-auto mt-4 lg:mt-0">
-             <h2 className="text-xl font-bold text-center text-indigo-200 mb-4">2. Realiza el pago</h2>
+             <h2 className="text-xl font-bold text-center text-slate-300 mb-4">2. Realiza el pago</h2>
             <PurchasePanel
               selectedNumbers={selectedNumbers}
               userInfo={userInfo}

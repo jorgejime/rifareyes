@@ -7,7 +7,7 @@ interface FooterProps {
 const Footer: React.FC<FooterProps> = ({ onAdminModeToggle }) => {
   return (
     <footer className="text-center p-4 mt-8">
-      <p className="text-xs text-indigo-400">
+      <p className="text-xs text-slate-500">
         Desarrollado por EIDEA SAS (
         <a
           href="https://www.centroeidea.com"
@@ -20,7 +20,7 @@ const Footer: React.FC<FooterProps> = ({ onAdminModeToggle }) => {
         ) |{' '}
         <span
           onClick={onAdminModeToggle}
-          className="font-bold text-indigo-300 hover:text-yellow-400 transition-colors cursor-pointer"
+          className="font-bold text-slate-400 hover:text-teal-400 transition-colors cursor-pointer"
           title="Activar modo administrador"
         >
           Acceso Administrador

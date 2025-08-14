@@ -20,19 +20,19 @@ const NumberButton: React.FC<{
   
   const getStatusClasses = () => {
     if (isViewing) {
-       return 'scale-110 ring-2 ring-offset-2 ring-cyan-400 ring-offset-gray-900';
+       return 'scale-110 ring-4 ring-offset-2 ring-cyan-400 ring-offset-slate-900 z-10';
     }
     if (isSelected) {
-      return 'bg-yellow-500 text-black scale-110 shadow-lg shadow-yellow-500/50';
+      return 'bg-gradient-to-br from-yellow-400 to-amber-500 text-slate-900 font-extrabold scale-110 shadow-lg shadow-yellow-500/50';
     }
     switch (status) {
       case 'sold':
-        return 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-60';
+        return 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-70';
       case 'pending':
         return 'bg-amber-600 text-white animate-pulse';
       case 'available':
       default:
-        return 'bg-indigo-800 text-indigo-200 hover:bg-indigo-700 hover:text-white';
+        return 'bg-slate-700 text-slate-300 hover:bg-teal-600 hover:text-white hover:shadow-lg hover:shadow-teal-500/50';
     }
   };
 
@@ -47,9 +47,9 @@ const NumberButton: React.FC<{
       onClick={onClick}
       disabled={disabled}
       className={`
-        aspect-square flex items-center justify-center text-sm md:text-base font-bold rounded-md transition-all duration-200 relative
+        aspect-square flex items-center justify-center text-sm md:text-base font-bold rounded-lg transition-all duration-200 relative
         ${getStatusClasses()}
-        ${!disabled ? 'hover:scale-105' : ''}
+        ${!disabled ? 'transform hover:scale-110 hover:z-10' : ''}
       `}
       aria-label={`Número ${num}, estado: ${status}`}
     >
@@ -60,11 +60,11 @@ const NumberButton: React.FC<{
 
 
 const NumberSelector: React.FC<NumberSelectorProps> = ({ tickets, selectedNumbers, onSelectNumber, isAdmin, viewingNumber }) => {
-  const numbers = Object.keys(tickets);
+  const numbers = Object.keys(tickets).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
 
   return (
     <div className="w-full max-w-md mx-auto">
-        <div className="grid grid-cols-10 gap-2 p-4 bg-black/20 rounded-lg border border-indigo-500/30">
+        <div className="grid grid-cols-10 gap-2 p-4 bg-slate-800/50 rounded-lg border border-teal-500/30 shadow-lg">
         {numbers.map((num) => {
             const ticket = tickets[num];
             const isSelected = selectedNumbers.includes(num);

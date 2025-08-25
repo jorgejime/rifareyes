@@ -1,12 +1,23 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { TicketData, RaffleTicket, TicketStatus, UserInfo } from './types';
+import type { TicketData, RaffleTicket, TicketStatus, UserInfo, RaffleSettings } from './types';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import NumberSelector from './components/NumberSelector';
 import PurchasePanel from './components/ResultPanel';
+import AdminPanel from './components/AdminPanel';
 
 const APP_STORAGE_KEY = 'raffle-tickets-storage';
+const RAFFLE_SETTINGS_KEY = 'raffle-settings-storage';
 const RESERVATION_EXPIRATION_MINUTES = 30;
+
+const defaultRaffleSettings: RaffleSettings = {
+  raffleName: 'Gran Rifa SAMMY',
+  prizeName: 'Premio Especial',
+  prizeValue: '$5,000,000',
+  ticketPrice: 20000,
+  prizeImageUrl: '',
+  lotteryName: 'Sinuano Noche'
+};
 
 const initializeTickets = (): TicketData => {
   return Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'))
@@ -20,10 +31,12 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<TicketData>({});
   const [selectedNumbers, setSelectedNumbers] = useState<string[]>([]);
   const [viewingNumber, setViewingNumber] = useState<string | null>(null);
-  const [userInfo, setUserInfo] = useState<UserInfo>({ name: '', cedula: '', whatsapp: '' });
+  const [userInfo, setUserInfo] = useState<UserInfo>({ name: '', whatsapp: '' });
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>(defaultRaffleSettings);
 
   const checkExpiredTickets = useCallback((currentTickets: TicketData): TicketData => {
     const now = Date.now();
@@ -52,9 +65,15 @@ const App: React.FC = () => {
       const validTickets = checkExpiredTickets(initialTickets);
       setTickets(validTickets);
 
+      // Load raffle settings
+      const savedSettingsJSON = localStorage.getItem(RAFFLE_SETTINGS_KEY);
+      const initialSettings = savedSettingsJSON ? JSON.parse(savedSettingsJSON) : defaultRaffleSettings;
+      setRaffleSettings(initialSettings);
+
     } catch (error) {
       console.error("Failed to load data from localStorage, resetting.", error);
       setTickets(initializeTickets());
+      setRaffleSettings(defaultRaffleSettings);
     } finally {
         setIsInitialized(true);
     }
@@ -69,6 +88,16 @@ const App: React.FC = () => {
         }
     }
   }, [tickets, isInitialized]);
+
+  useEffect(() => {
+    if (isInitialized) {
+        try {
+            localStorage.setItem(RAFFLE_SETTINGS_KEY, JSON.stringify(raffleSettings));
+        } catch (error) {
+            console.error("Failed to save settings to localStorage", error);
+        }
+    }
+  }, [raffleSettings, isInitialized]);
 
   const handleSelectNumber = useCallback((number: string) => {
     const ticket = tickets[number];
@@ -102,7 +131,20 @@ const App: React.FC = () => {
     setUserInfo(prev => ({ ...prev, [name]: value }));
   };
 
-  const updateTicketStatus = (numbers: string[], newStatus: TicketStatus, details?: Partial<RaffleTicket>) => {
+
+  const handleConfirmPurchase = useCallback(() => {
+    if (selectedNumbers.length > 0) {
+      const reservationDetails = {
+          owner: userInfo,
+          reservationTimestamp: Date.now()
+      };
+      updateTicketStatus(selectedNumbers, 'pending', reservationDetails);
+      setShowConfirmation(true);
+    }
+  }, [selectedNumbers, userInfo]);
+
+  // Update ticket price dynamically
+  const updateTicketStatus = useCallback((numbers: string[], newStatus: TicketStatus, details?: Partial<RaffleTicket>) => {
     setTickets(prevTickets => {
         const newTickets = { ...prevTickets };
         numbers.forEach(num => {
@@ -123,43 +165,35 @@ const App: React.FC = () => {
         });
         return newTickets;
     });
-  };
-
-  const handleConfirmPurchase = useCallback(() => {
-    if (selectedNumbers.length > 0) {
-      const reservationDetails = {
-          owner: userInfo,
-          reservationTimestamp: Date.now()
-      };
-      updateTicketStatus(selectedNumbers, 'pending', reservationDetails);
-      setShowConfirmation(true);
-    }
-  }, [selectedNumbers, userInfo]);
+  }, []);
 
   const handleResetPurchase = useCallback(() => {
       setSelectedNumbers([]);
-      setUserInfo({ name: '', cedula: '', whatsapp: '' });
+      setUserInfo({ name: '', whatsapp: '' });
       setViewingNumber(null);
       setShowConfirmation(false);
   }, []);
 
-  const handleMarkAsSold = useCallback(() => {
-     if (isAdmin && viewingNumber && tickets[viewingNumber]?.status === 'pending') {
-      updateTicketStatus([viewingNumber], 'sold');
-      setViewingNumber(null);
+  const handleMarkAsSold = useCallback((number?: string) => {
+    const targetNumber = number || viewingNumber;
+    if (isAdmin && targetNumber && tickets[targetNumber]?.status === 'pending') {
+      updateTicketStatus([targetNumber], 'sold');
+      if (!number) setViewingNumber(null); // Only clear viewing if called from detail view
     }
   }, [isAdmin, viewingNumber, tickets]);
   
-  const handleReleaseTicket = useCallback(() => {
-     if (isAdmin && viewingNumber && tickets[viewingNumber]?.status === 'pending') {
-      updateTicketStatus([viewingNumber], 'available');
-      setViewingNumber(null);
+  const handleReleaseTicket = useCallback((number?: string) => {
+    const targetNumber = number || viewingNumber;
+    if (isAdmin && targetNumber && tickets[targetNumber]?.status === 'pending') {
+      updateTicketStatus([targetNumber], 'available');
+      if (!number) setViewingNumber(null); // Only clear viewing if called from detail view
     }
   }, [isAdmin, viewingNumber, tickets]);
 
   const handleAdminModeToggle = useCallback(() => {
     if (isAdmin) {
         setIsAdmin(false);
+        setShowAdminPanel(false);
         alert('Modo Administrador Desactivado');
         return;
     }
@@ -170,11 +204,23 @@ const App: React.FC = () => {
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '1234'; 
     if (password === ADMIN_PASSWORD) {
         setIsAdmin(true);
-        alert('Modo Administrador Activado');
+        setShowAdminPanel(true); // Auto-open admin panel
     } else {
         alert('Contraseña incorrecta.');
     }
   }, [isAdmin]);
+
+  const handleShowReport = useCallback(() => {
+    setShowAdminPanel(true);
+  }, []);
+
+  const handleCloseReport = useCallback(() => {
+    setShowAdminPanel(false);
+  }, []);
+
+  const handleUpdateRaffleSettings = useCallback((newSettings: RaffleSettings) => {
+    setRaffleSettings(newSettings);
+  }, []);
 
   const viewingTicket = useMemo(() => {
     if (!viewingNumber || !tickets[viewingNumber]) return null;
@@ -193,7 +239,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900 text-white flex flex-col items-center justify-between p-2 sm:p-4">
       <main className="w-full">
-        <Header />
+        <Header raffleSettings={raffleSettings} />
         <div className="mt-4 md:mt-8 flex flex-col lg:flex-row lg:items-start lg:justify-center gap-4 md:gap-8 px-2 sm:px-4">
           <div className="flex-shrink-0 lg:w-1/2 max-w-md w-full mx-auto">
             <h2 className="text-xl font-bold text-center text-slate-300 mb-4">1. Elige tu número</h2>
@@ -218,11 +264,26 @@ const App: React.FC = () => {
               onMarkAsSold={handleMarkAsSold}
               onReleaseTicket={handleReleaseTicket}
               showConfirmation={showConfirmation}
+              raffleSettings={raffleSettings}
             />
           </div>
         </div>
       </main>
-      <Footer onAdminModeToggle={handleAdminModeToggle} />
+      <Footer 
+        onAdminModeToggle={handleAdminModeToggle} 
+        isAdmin={isAdmin}
+        onShowReport={handleShowReport}
+      />
+      {showAdminPanel && (
+        <AdminPanel 
+          tickets={tickets} 
+          onClose={handleCloseReport}
+          onMarkAsSold={handleMarkAsSold}
+          onReleaseTicket={handleReleaseTicket}
+          raffleSettings={raffleSettings}
+          onUpdateRaffleSettings={handleUpdateRaffleSettings}
+        />
+      )}
     </div>
   );
 };

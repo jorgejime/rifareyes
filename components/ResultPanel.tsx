@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RaffleTicket, UserInfo } from '../types';
+import type { RaffleTicket, UserInfo, RaffleSettings } from '../types';
 
 interface PurchasePanelProps {
   selectedNumbers: string[];
@@ -12,11 +12,11 @@ interface PurchasePanelProps {
   onMarkAsSold: () => void;
   onReleaseTicket: () => void;
   showConfirmation: boolean;
+  raffleSettings: RaffleSettings;
 }
 
 const WHATSAPP_NUMBER = "573189747253";
 const NEQUI_NUMBER = "318-413-1391";
-const TICKET_PRICE = 20000;
 
 const InfoRow: React.FC<{ label: string; value: React.ReactNode; className?: string }> = ({ label, value, className = '' }) => (
   <div className={`flex justify-between items-center py-2 border-b border-slate-600/50 ${className}`}>
@@ -32,18 +32,21 @@ const PurchaseForm: React.FC<Omit<PurchasePanelProps, 'viewingTicket' | 'isAdmin
   onConfirmPurchase,
   onResetPurchase,
   showConfirmation,
+  raffleSettings,
 }) => {
-  const total = selectedNumbers.length * TICKET_PRICE;
-  const isFormValid = userInfo.name.trim() && userInfo.cedula.trim() && userInfo.whatsapp.trim();
+  const total = selectedNumbers.length * raffleSettings.ticketPrice;
+  const isFormValid = userInfo.name.trim() && userInfo.whatsapp.trim();
   
   const formattedNumbers = selectedNumbers.join(', ');
   const whatsappMessage = encodeURIComponent(
-    `Hola SAMMY, quiero reservar los siguientes números para la rifa. En los próximos 30 minutos, realizaré el pago a Nequi ${NEQUI_NUMBER} y enviaré el comprobante para asegurar mi compra.\n\n` +
+    `Hola SAMMY, quiero reservar los siguientes números para ${raffleSettings.raffleName}. En los próximos 30 minutos, realizaré el pago a Nequi ${NEQUI_NUMBER} y enviaré el comprobante para asegurar mi compra.\n\n` +
+    `*Rifa:* ${raffleSettings.raffleName}\n` +
+    `*Premio:* ${raffleSettings.prizeName} - ${raffleSettings.prizeValue}\n` +
     `*Números a reservar:* ${formattedNumbers}\n` +
     `*Total a pagar:* $${total.toLocaleString('es-CO')} COP\n\n` +
     `*Mis datos de registro:*\n` +
     `- Nombre: ${userInfo.name}\n` +
-    `- Cédula: ${userInfo.cedula}\n\n` +
+    `- WhatsApp: ${userInfo.whatsapp}\n\n` +
     `¡Quedo atento!`
   );
   const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappMessage}`;
@@ -76,13 +79,12 @@ const PurchaseForm: React.FC<Omit<PurchasePanelProps, 'viewingTicket' | 'isAdmin
   return (
     <div className="animate-fade-in">
       <div className="mb-4">
-        <InfoRow label="Números" value={selectedNumbers.length > 5 ? `${selectedNumbers.slice(0, 5).join(', ')}...` : formattedNumbers} />
+        <InfoRow label="Números" value={formattedNumbers} />
         <InfoRow label="Total a Pagar" value={`$${total.toLocaleString('es-CO')} COP`} className="text-yellow-300" />
       </div>
 
       <div className="space-y-3 my-4">
         <input type="text" name="name" value={userInfo.name} onChange={onUserInfoChange} placeholder="Nombre Completo" className="w-full bg-slate-900/70 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-teal-400 focus:border-teal-400 outline-none" required />
-        <input type="text" name="cedula" value={userInfo.cedula} onChange={onUserInfoChange} placeholder="Cédula" className="w-full bg-slate-900/70 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-teal-400 focus:border-teal-400 outline-none" required />
         <input type="tel" name="whatsapp" value={userInfo.whatsapp} onChange={onUserInfoChange} placeholder="Número de WhatsApp" className="w-full bg-slate-900/70 border border-slate-600 rounded-md p-2 text-white placeholder-slate-400 focus:ring-2 focus:ring-teal-400 focus:border-teal-400 outline-none" required />
       </div>
       
@@ -125,7 +127,6 @@ const TicketDetails: React.FC<Pick<PurchasePanelProps, 'viewingTicket' | 'isAdmi
         {data.status === 'pending' && data.owner && (
             <div className="mt-4 text-left p-3 bg-slate-900/50 rounded-lg border border-slate-700/50">
                 <InfoRow label="Nombre" value={data.owner.name} />
-                <InfoRow label="Cédula" value={data.owner.cedula} />
                 <InfoRow label="WhatsApp" value={data.owner.whatsapp} />
                 <InfoRow label="Reservado" value={reservationTime} />
             </div>
@@ -134,13 +135,13 @@ const TicketDetails: React.FC<Pick<PurchasePanelProps, 'viewingTicket' | 'isAdmi
         {isAdmin && data.status === 'pending' && (
             <div className="mt-auto pt-4 space-y-2">
                 <button 
-                    onClick={onMarkAsSold}
+                    onClick={() => onMarkAsSold()}
                     className="w-full py-2 px-4 bg-green-600 text-white font-bold rounded-lg shadow-lg hover:bg-green-500 transition-colors"
                 >
                     Confirmar Pago (Vendido)
                 </button>
                 <button 
-                    onClick={onReleaseTicket}
+                    onClick={() => onReleaseTicket()}
                     className="w-full py-2 px-4 bg-red-700 text-white font-bold rounded-lg shadow-lg hover:bg-red-600 transition-colors"
                 >
                     Liberar Número

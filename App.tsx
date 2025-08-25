@@ -1,31 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { TicketData, RaffleTicket, TicketStatus, UserInfo, RaffleSettings } from './types';
+import { RaffleService } from './services/raffleService';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import NumberSelector from './components/NumberSelector';
 import PurchasePanel from './components/ResultPanel';
 import AdminPanel from './components/AdminPanel';
-
-const APP_STORAGE_KEY = 'raffle-tickets-storage';
-const RAFFLE_SETTINGS_KEY = 'raffle-settings-storage';
-const RESERVATION_EXPIRATION_MINUTES = 30;
-
-const defaultRaffleSettings: RaffleSettings = {
-  raffleName: 'Gran Rifa SAMMY',
-  prizeName: 'Premio Especial',
-  prizeValue: '$5,000,000',
-  ticketPrice: 20000,
-  prizeImageUrl: '',
-  lotteryName: 'Sinuano Noche'
-};
-
-const initializeTickets = (): TicketData => {
-  return Array.from({ length: 100 }, (_, i) => i.toString().padStart(2, '0'))
-    .reduce((acc, num) => {
-      acc[num] = { status: 'available' };
-      return acc;
-    }, {} as TicketData);
-};
 
 const App: React.FC = () => {
   const [tickets, setTickets] = useState<TicketData>({});
@@ -36,68 +16,109 @@ const App: React.FC = () => {
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [showConfirmation, setShowConfirmation] = useState<boolean>(false);
   const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
-  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>(defaultRaffleSettings);
+  const [raffleSettings, setRaffleSettings] = useState<RaffleSettings>({
+    raffleName: 'Gran Rifa SAMMY',
+    prizeName: 'Premio Especial',
+    prizeValue: '$5,000,000',
+    ticketPrice: 20000,
+    prizeImageUrl: '',
+    lotteryName: 'Sinuano Noche'
+  });
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const checkExpiredTickets = useCallback((currentTickets: TicketData): TicketData => {
-    const now = Date.now();
-    const expirationMs = RESERVATION_EXPIRATION_MINUTES * 60 * 1000;
-    const updatedTickets = { ...currentTickets };
-    let changed = false;
-
-    Object.keys(updatedTickets).forEach(num => {
-      const ticket = updatedTickets[num];
-      if (ticket.status === 'pending' && ticket.reservationTimestamp) {
-        if (now - ticket.reservationTimestamp > expirationMs) {
-          console.log(`Ticket ${num} expired. Releasing.`);
-          updatedTickets[num] = { status: 'available' };
-          changed = true;
-        }
-      }
-    });
-
-    return changed ? updatedTickets : currentTickets;
+  // Cargar datos iniciales
+  const loadInitialData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Cargar configuración y tickets en paralelo
+      const [settings, ticketsData] = await Promise.all([
+        RaffleService.getRaffleSettings(),
+        RaffleService.getAllTickets()
+      ]);
+      
+      setRaffleSettings(settings);
+      setTickets(ticketsData);
+      
+      // Liberar tickets expirados
+      await RaffleService.releaseExpiredTickets();
+      
+    } catch (err) {
+      console.error('Error al cargar datos:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } finally {
+      setLoading(false);
+      setIsInitialized(true);
+    }
   }, []);
 
   useEffect(() => {
+    loadInitialData();
+  }, [loadInitialData]);
+
+  // Suscripciones en tiempo real
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    // Suscribirse a cambios de tickets
+    const unsubscribeTickets = RaffleService.subscribeToTicketChanges((updatedTickets) => {
+      setTickets(updatedTickets);
+    });
+
+    // Suscribirse a cambios de configuración
+    const unsubscribeSettings = RaffleService.subscribeToSettingsChanges((updatedSettings) => {
+      setRaffleSettings(updatedSettings);
+    });
+
+    return () => {
+      unsubscribeTickets();
+      unsubscribeSettings();
+    };
+  }, [isInitialized]);
+
+  // Verificar tickets expirados periódicamente
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const interval = setInterval(async () => {
+      try {
+        await RaffleService.releaseExpiredTickets();
+      } catch (error) {
+        console.error('Error al verificar tickets expirados:', error);
+      }
+    }, 60000); // Verificar cada minuto
+
+    return () => clearInterval(interval);
+  }, [isInitialized]);
+
+  const handleConfirmPurchase = useCallback(async () => {
+    if (selectedNumbers.length === 0) return;
+
     try {
-      const savedTicketsJSON = localStorage.getItem(APP_STORAGE_KEY);
-      const initialTickets = savedTicketsJSON ? JSON.parse(savedTicketsJSON) : initializeTickets();
-      const validTickets = checkExpiredTickets(initialTickets);
-      setTickets(validTickets);
-
-      // Load raffle settings
-      const savedSettingsJSON = localStorage.getItem(RAFFLE_SETTINGS_KEY);
-      const initialSettings = savedSettingsJSON ? JSON.parse(savedSettingsJSON) : defaultRaffleSettings;
-      setRaffleSettings(initialSettings);
-
+      setLoading(true);
+      await RaffleService.reserveTickets(selectedNumbers, userInfo);
+      setShowConfirmation(true);
     } catch (error) {
-      console.error("Failed to load data from localStorage, resetting.", error);
-      setTickets(initializeTickets());
-      setRaffleSettings(defaultRaffleSettings);
+      console.error('Error al reservar tickets:', error);
+      alert('Error al reservar los números. Por favor intenta de nuevo.');
     } finally {
-        setIsInitialized(true);
+      setLoading(false);
     }
-  }, [checkExpiredTickets]);
-  
-  useEffect(() => {
-    if (isInitialized) {
-        try {
-            localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(tickets));
-        } catch (error) {
-            console.error("Failed to save data to localStorage", error);
-        }
-    }
-  }, [tickets, isInitialized]);
+  }, [selectedNumbers, userInfo]);
 
-  useEffect(() => {
-    if (isInitialized) {
-        try {
-            localStorage.setItem(RAFFLE_SETTINGS_KEY, JSON.stringify(raffleSettings));
-        } catch (error) {
-            console.error("Failed to save settings to localStorage", error);
-        }
+  const updateTicketStatus = useCallback(async (numbers: string[], newStatus: TicketStatus) => {
+    try {
+      setLoading(true);
+      await RaffleService.updateTicketStatus(numbers, newStatus);
+    } catch (error) {
+      console.error('Error al actualizar estado:', error);
+      alert('Error al actualizar el estado del número. Por favor intenta de nuevo.');
+    } finally {
+      setLoading(false);
     }
-  }, [raffleSettings, isInitialized]);
+  }, []);
 
   const handleSelectNumber = useCallback((number: string) => {
     const ticket = tickets[number];
@@ -130,42 +151,6 @@ const App: React.FC = () => {
     const { name, value } = e.target;
     setUserInfo(prev => ({ ...prev, [name]: value }));
   };
-
-
-  const handleConfirmPurchase = useCallback(() => {
-    if (selectedNumbers.length > 0) {
-      const reservationDetails = {
-          owner: userInfo,
-          reservationTimestamp: Date.now()
-      };
-      updateTicketStatus(selectedNumbers, 'pending', reservationDetails);
-      setShowConfirmation(true);
-    }
-  }, [selectedNumbers, userInfo]);
-
-  // Update ticket price dynamically
-  const updateTicketStatus = useCallback((numbers: string[], newStatus: TicketStatus, details?: Partial<RaffleTicket>) => {
-    setTickets(prevTickets => {
-        const newTickets = { ...prevTickets };
-        numbers.forEach(num => {
-            if (newTickets[num]) {
-                newTickets[num] = { 
-                  ...newTickets[num],
-                  status: newStatus,
-                  ...details
-                };
-                if (newStatus === 'available') {
-                    delete newTickets[num].owner;
-                    delete newTickets[num].reservationTimestamp;
-                }
-                if (newStatus === 'sold') {
-                    delete newTickets[num].reservationTimestamp;
-                }
-            }
-        });
-        return newTickets;
-    });
-  }, []);
 
   const handleResetPurchase = useCallback(() => {
       setSelectedNumbers([]);
@@ -218,8 +203,17 @@ const App: React.FC = () => {
     setShowAdminPanel(false);
   }, []);
 
-  const handleUpdateRaffleSettings = useCallback((newSettings: RaffleSettings) => {
-    setRaffleSettings(newSettings);
+  const handleUpdateRaffleSettings = useCallback(async (newSettings: RaffleSettings) => {
+    try {
+      setLoading(true);
+      await RaffleService.updateRaffleSettings(newSettings);
+      setRaffleSettings(newSettings);
+    } catch (error) {
+      console.error('Error al actualizar configuración:', error);
+      alert('Error al guardar la configuración. Por favor intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const viewingTicket = useMemo(() => {
@@ -227,17 +221,36 @@ const App: React.FC = () => {
     return { number: viewingNumber, data: tickets[viewingNumber] };
   }, [viewingNumber, tickets]);
 
-
-  if (!isInitialized) {
+  if (loading && !isInitialized) {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
-            <p className="text-white text-2xl animate-pulse">Cargando Rifa...</p>
+            <div className="text-center">
+              <p className="text-white text-2xl animate-pulse mb-4">Cargando Rifa...</p>
+              <p className="text-slate-400">Conectando con Supabase...</p>
+            </div>
         </div>
     );
   }
 
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-black flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <p className="text-red-400 text-xl mb-4">Error de Conexión</p>
+          <p className="text-slate-300 mb-6">{error}</p>
+          <button
+            onClick={loadInitialData}
+            className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900 text-white flex flex-col items-center justify-between p-2 sm:p-4">
+    <div className={`min-h-screen bg-gradient-to-br from-slate-900 via-black to-slate-900 text-white flex flex-col items-center justify-between p-2 sm:p-4 ${loading ? 'opacity-75 pointer-events-none' : ''}`}>
       <main className="w-full">
         <Header raffleSettings={raffleSettings} />
         <div className="mt-4 md:mt-8 flex flex-col lg:flex-row lg:items-start lg:justify-center gap-4 md:gap-8 px-2 sm:px-4">
@@ -283,6 +296,15 @@ const App: React.FC = () => {
           raffleSettings={raffleSettings}
           onUpdateRaffleSettings={handleUpdateRaffleSettings}
         />
+      )}
+      
+      {loading && (
+        <div className="fixed top-4 right-4 bg-slate-800 border border-teal-500 rounded-lg p-3 z-50">
+          <div className="flex items-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-teal-400"></div>
+            <span className="text-sm text-slate-300">Actualizando...</span>
+          </div>
+        </div>
       )}
     </div>
   );

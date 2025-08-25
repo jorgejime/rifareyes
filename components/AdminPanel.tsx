@@ -268,8 +268,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ tickets, onMarkAsSold, onReleas
   };
 
   const handleSaveSettings = () => {
-    onUpdateRaffleSettings(tempSettings);
-    alert('Configuración guardada exitosamente');
+    onUpdateRaffleSettings(tempSettings)
+      .then(() => {
+        alert('Configuración guardada exitosamente');
+      })
+      .catch((error) => {
+        alert(`Error al guardar: ${error.message}`);
+      });
   };
 
   const handleResetSettings = () => {

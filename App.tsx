@@ -33,6 +33,12 @@ const App: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      // Verificar si Supabase está configurado
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        setError('Supabase no está configurado. Por favor configura las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY');
+        return;
+      }
+      
       // Cargar configuración y tickets en paralelo
       const [settings, ticketsData] = await Promise.all([
         RaffleService.getRaffleSettings(),

@@ -4,6 +4,19 @@ import type { RaffleSettings, TicketData, RaffleTicket, UserInfo, TicketStatus }
 export class RaffleService {
   // Configuración de la rifa
   static async getRaffleSettings(): Promise<RaffleSettings> {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      console.warn('Supabase no configurado, usando datos por defecto');
+      return {
+        raffleName: 'Gran Rifa SAMMY',
+        prizeName: 'Premio Especial',
+        prizeValue: '$5,000,000',
+        ticketPrice: 20000,
+        prizeImageUrl: '',
+        lotteryName: 'Sinuano Noche'
+      };
+    }
+
     const { data, error } = await supabase
       .from('raffle_settings')
       .select('*')
@@ -11,7 +24,15 @@ export class RaffleService {
 
     if (error) {
       console.error('Error al obtener configuración:', error);
-      throw new Error('No se pudo cargar la configuración de la rifa');
+      // Retornar configuración por defecto si hay error
+      return {
+        raffleName: 'Gran Rifa SAMMY',
+        prizeName: 'Premio Especial',
+        prizeValue: '$5,000,000',
+        ticketPrice: 20000,
+        prizeImageUrl: '',
+        lotteryName: 'Sinuano Noche'
+      };
     }
 
     return {
@@ -25,6 +46,39 @@ export class RaffleService {
   }
 
   static async updateRaffleSettings(settings: RaffleSettings): Promise<void> {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      console.warn('Supabase no configurado, cambios no se guardarán');
+      throw new Error('Supabase no está configurado. Los cambios no se pueden guardar.');
+    }
+
+    // Primero obtener el ID de la configuración existente
+    const { data: existingData, error: selectError } = await supabase
+      .from('raffle_settings')
+      .select('id')
+      .single();
+
+    if (selectError) {
+      console.error('Error al obtener ID de configuración:', selectError);
+      // Si no existe, crear una nueva entrada
+      const { error: insertError } = await supabase
+        .from('raffle_settings')
+        .insert({
+          raffle_name: settings.raffleName,
+          prize_name: settings.prizeName,
+          prize_value: settings.prizeValue,
+          ticket_price: settings.ticketPrice,
+          prize_image_url: settings.prizeImageUrl,
+          lottery_name: settings.lotteryName
+        });
+
+      if (insertError) {
+        console.error('Error al crear configuración:', insertError);
+        throw new Error('No se pudo crear la configuración');
+      }
+      return;
+    }
+
     const { error } = await supabase
       .from('raffle_settings')
       .update({
@@ -35,7 +89,7 @@ export class RaffleService {
         prize_image_url: settings.prizeImageUrl,
         lottery_name: settings.lotteryName
       })
-      .eq('id', (await supabase.from('raffle_settings').select('id').single()).data?.id);
+      .eq('id', existingData.id);
 
     if (error) {
       console.error('Error al actualizar configuración:', error);
@@ -45,6 +99,18 @@ export class RaffleService {
 
   // Gestión de tickets
   static async getAllTickets(): Promise<TicketData> {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      console.warn('Supabase no configurado, generando tickets por defecto');
+      // Generar tickets por defecto del 00 al 99
+      const defaultTickets: TicketData = {};
+      for (let i = 0; i <= 99; i++) {
+        const number = i.toString().padStart(2, '0');
+        defaultTickets[number] = { status: 'available' };
+      }
+      return defaultTickets;
+    }
+
     const { data, error } = await supabase
       .from('tickets')
       .select('*')
@@ -52,7 +118,13 @@ export class RaffleService {
 
     if (error) {
       console.error('Error al obtener tickets:', error);
-      throw new Error('No se pudieron cargar los tickets');
+      // Generar tickets por defecto si hay error
+      const defaultTickets: TicketData = {};
+      for (let i = 0; i <= 99; i++) {
+        const number = i.toString().padStart(2, '0');
+        defaultTickets[number] = { status: 'available' };
+      }
+      return defaultTickets;
     }
 
     const ticketData: TicketData = {};
@@ -72,6 +144,11 @@ export class RaffleService {
   }
 
   static async reserveTickets(numbers: string[], userInfo: UserInfo): Promise<void> {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      throw new Error('Supabase no está configurado. No se pueden reservar números.');
+    }
+
     const reservationTime = new Date().toISOString();
     
     const updates = numbers.map(number => ({
@@ -93,6 +170,11 @@ export class RaffleService {
   }
 
   static async updateTicketStatus(numbers: string[], status: TicketStatus): Promise<void> {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      throw new Error('Supabase no está configurado. No se puede actualizar el estado.');
+    }
+
     const updates: any = { status };
     
     if (status === 'available') {
@@ -115,6 +197,11 @@ export class RaffleService {
   }
 
   static async releaseExpiredTickets(): Promise<string[]> {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      return [];
+    }
+
     const expirationTime = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     
     // Primero obtener los tickets expirados
@@ -156,6 +243,11 @@ export class RaffleService {
 
   // Suscripción a cambios en tiempo real
   static subscribeToTicketChanges(callback: (tickets: TicketData) => void) {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      return () => {}; // Retornar función vacía
+    }
+
     const subscription = supabase
       .channel('tickets-changes')
       .on('postgres_changes', 
@@ -177,6 +269,11 @@ export class RaffleService {
   }
 
   static subscribeToSettingsChanges(callback: (settings: RaffleSettings) => void) {
+    // Verificar si Supabase está configurado
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+      return () => {}; // Retornar función vacía
+    }
+
     const subscription = supabase
       .channel('settings-changes')
       .on('postgres_changes',

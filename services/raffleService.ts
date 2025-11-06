@@ -20,11 +20,23 @@ export class RaffleService {
     const { data, error } = await supabase
       .from('raffle_settings')
       .select('*')
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error('Error al obtener configuración:', error);
       // Retornar configuración por defecto si hay error
+      return {
+        raffleName: 'Gran Rifa SAMMY',
+        prizeName: 'Premio Especial',
+        prizeValue: '$5,000,000',
+        ticketPrice: 20000,
+        prizeImageUrl: '',
+        lotteryName: 'Sinuano Noche'
+      };
+    }
+
+    if (!data) {
+      // No hay configuración guardada, retornar valores por defecto
       return {
         raffleName: 'Gran Rifa SAMMY',
         prizeName: 'Premio Especial',
@@ -56,11 +68,15 @@ export class RaffleService {
     const { data: existingData, error: selectError } = await supabase
       .from('raffle_settings')
       .select('id')
-      .single();
+      .maybeSingle();
 
     if (selectError) {
       console.error('Error al obtener ID de configuración:', selectError);
-      // Si no existe, crear una nueva entrada
+      throw new Error('No se pudo verificar la configuración existente');
+    }
+
+    if (!existingData) {
+      // No existe, crear una nueva entrada
       const { error: insertError } = await supabase
         .from('raffle_settings')
         .insert({

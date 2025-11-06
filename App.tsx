@@ -33,6 +33,14 @@ const App: React.FC = () => {
       setLoading(true);
       setError(null);
       
+      // Logs de diagnóstico para variables de entorno de Supabase
+      console.log('=== DIAGNÓSTICO SUPABASE ===');
+      console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('VITE_SUPABASE_ANON_KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY);
+      console.log('URL válida:', !!import.meta.env.VITE_SUPABASE_URL);
+      console.log('Key válida:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      console.log('============================');
+      
       // Verificar si Supabase está configurado
       if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
         setError('Supabase no está configurado. Por favor configura las variables de entorno VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY');
